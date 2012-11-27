@@ -65,6 +65,7 @@ type SSHClient struct {
 	User           string
 	ClientKeychain *keychain
 	Host           string
+	Session        ssh.Session
 }
 
 func NewSSHClient(user string, privateKey string, host string) *SSHClient {
@@ -79,7 +80,7 @@ func NewSSHClient(user string, privateKey string, host string) *SSHClient {
 	}
 }
 
-func (c *SSHClient) Connect() {
+func (c *SSHClient) init() {
 	config := &ssh.ClientConfig{
 		User: c.User,
 		Auth: []ssh.ClientAuth{
@@ -91,12 +92,17 @@ func (c *SSHClient) Connect() {
 	if err != nil {
 		panic("Failed to dial:" + err.Error())
 	}
-	session, err := client.NewSession()
+
+	c.Session, _ = client.NewSession()
+
 	// defer session.Close()
+}
+
+func (c *SSHClient) Run(command string) string {
 	var b bytes.Buffer
-	session.Stdout = &b
-	if err := session.Run("ls -l"); err != nil {
+	c.Session.Stdout = &b
+	if err := c.Session.Run(command); err != nil {
 		panic("Failed to run: " + err.Error())
 	}
-	fmt.Println(b.String())
+	return b.String()
 }

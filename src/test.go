@@ -13,5 +13,5 @@ var (
 func main() {
 	log.Println("Hello")
 	ssh_client := net.NewSSHClient("hugo", privateKey, "localhost:22")
-	ssh_client.Connect()
+	ssh_client.Run("ls -l")
 }
