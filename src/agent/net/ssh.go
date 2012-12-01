@@ -10,9 +10,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 )
 
 type keychain struct {
@@ -65,44 +65,75 @@ type SSHClient struct {
 	User           string
 	ClientKeychain *keychain
 	Host           string
-	Session        ssh.Session
+	Connection     *ssh.ClientConn
+	Connected      bool
 }
 
+/**
+ * A SSHClient keeps long connection to remote server and run a command at a time
+ */
 func NewSSHClient(user string, privateKey string, host string) *SSHClient {
 	clientKeychain := new(keychain)
 	block, _ := pem.Decode([]byte(privateKey))
+	if block == nil {
+		panic("Failed to decode ssh private key")
+	}
 	rsakey, _ := x509.ParsePKCS1PrivateKey(block.Bytes)
 	clientKeychain.keys = append(clientKeychain.keys, rsakey)
-	return &SSHClient{
+	c := &SSHClient{
 		User:           user,
 		ClientKeychain: clientKeychain,
 		Host:           host,
 	}
+	return c
 }
 
-func (c *SSHClient) init() {
-	config := &ssh.ClientConfig{
-		User: c.User,
-		Auth: []ssh.ClientAuth{
-			ssh.ClientAuthKeyring(c.ClientKeychain),
-		},
-	}
-	client, err := ssh.Dial("tcp", c.Host, config)
-	// defer client.Close()
-	if err != nil {
-		panic("Failed to dial:" + err.Error())
-	}
+func (c *SSHClient) connect() {
+	if !c.Connected {
+		config := &ssh.ClientConfig{
+			User: c.User,
+			Auth: []ssh.ClientAuth{
+				ssh.ClientAuthKeyring(c.ClientKeychain),
+			},
+		}
+		conn, err := ssh.Dial("tcp", c.Host, config)
+		// defer conn.Close()
+		if err != nil {
+			panic("Failed to dial:" + err.Error())
+		}
+		log.Println("[Info] connected to " + c.Host)
 
-	c.Session, _ = client.NewSession()
-
-	// defer session.Close()
+		c.Connection = conn
+		c.Connected = true
+	}
 }
 
 func (c *SSHClient) Run(command string) string {
+	defer func() {
+		/**
+		 *  Reconnect if there is problems
+		 */
+		if x := recover(); x != nil {
+			c.Close()
+			c.Connected = false
+			log.Printf("[Error] failed to connect %s: %v", c.Host, x)
+		}
+	}()
+
+	c.connect()
 	var b bytes.Buffer
-	c.Session.Stdout = &b
-	if err := c.Session.Run(command); err != nil {
+	session, _ := c.Connection.NewSession()
+	defer session.Close()
+
+	session.Stdout = &b
+	if err := session.Run(command); err != nil {
 		panic("Failed to run: " + err.Error())
 	}
 	return b.String()
+}
+
+func (c *SSHClient) Close() {
+	if c.Connection != nil {
+		c.Connection.Close()
+	}
 }
