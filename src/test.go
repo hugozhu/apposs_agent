@@ -4,6 +4,7 @@ import (
 	"agent"
 	"io/ioutil"
 	"log"
+	"os"
 	"time"
 )
 
@@ -14,10 +15,10 @@ var (
 )
 
 func init() {
-	tmp, _ := ioutil.ReadFile("/Users/hugozhu/.ssh/mefans_id_rsa")
+	tmp, _ := ioutil.ReadFile(os.Getenv("HOME") + "/.ssh/test_id_rsa")
 	privateKey = string(tmp)
 	user = "hugo"
-	host = "us.myalert.info:22"
+	host = "test_host:22"
 }
 
 func main() {
@@ -26,5 +27,6 @@ func main() {
 		log.Println(output, err)
 	})
 	my_agent.Send("ls -l")
+	my_agent.Send("whoami")
 	time.Sleep(5 * time.Second)
 }
