@@ -5,21 +5,21 @@ import (
 )
 
 type SSHAgent struct {
-	Commands chan string
-	Client   *net.SSHClient
-	quit     chan bool
+	Commands  chan string
+	Client    *net.SSHClient
+	quit_chan chan bool
 }
 
 func New(user string, privateKey string, host string) *SSHAgent {
 	agent := new(SSHAgent)
-	agent.quit = make(chan bool)
+	agent.quit_chan = make(chan bool)
 	agent.Client = net.NewSSHClient(user, privateKey, host)
 	agent.init()
 	return agent
 }
 
 func (a *SSHAgent) init() {
-	agent.Commands = make(string, 100)
+	a.Commands = make(chan string, 100)
 }
 
 func (a *SSHAgent) Send(cmd string) {
@@ -32,19 +32,20 @@ func (a *SSHAgent) Send(cmd string) {
 }
 
 func (a *SSHAgent) Shutdown() {
-	quit <- true
+	a.quit_chan <- true
 	a.Client.Close()
-	agent.init()
+	a.init()
 }
 
-func (a *SSHAgent) Run() {
+func (a *SSHAgent) Run(callback func(output string, err error)) {
 	go func() {
 		for {
 			select {
-			case <-quit:
+			case <-a.quit_chan:
 				return
-			case cmd := <-commands:
-				result := a.Client.Run(cmd)
+			case cmd := <-a.Commands:
+				result, err := a.Client.Run(cmd)
+				callback(result, err)
 			}
 		}
 	}()

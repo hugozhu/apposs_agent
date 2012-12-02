@@ -23,14 +23,15 @@ var (
 )
 
 func init() {
-	tmp, _ := ioutil.ReadFile("/Users/hugozhu/.ssh/id_rsa")
+	tmp, _ := ioutil.ReadFile(os.Getenv("HOME") + "/.ssh/test_id_rsa")
 	privateKey = string(tmp)
 	user = "hugo"
 	hosts = make(map[string]*net.SSHClient)
 }
+
 func main() {
-	hosts["us"] = agent.New(user, privateKey, "us.myalert.info:22")
-	hosts["jp"] = agent.New(user, privateKey, "jp.myalert.info:22")
+	hosts["us"] = agent.New(user, privateKey, "test_host:22")
+	hosts["jp"] = agent.New(user, privateKey, "test_host:22")
 
 	http.HandleFunc("/", handler)
 	s := &http.Server{

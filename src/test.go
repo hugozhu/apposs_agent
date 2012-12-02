@@ -1,15 +1,30 @@
 package main
 
 import (
-	"agent/net"
+	"agent"
 	"io/ioutil"
 	"log"
+	"time"
 )
 
-func main() {
-	privateKey, _ := ioutil.ReadFile("/Users/hugozhu/.ssh/id_rsa")
-	ssh_client := net.NewSSHClient("hugo", string(privateKey), "us.myalert.info:22")
-	log.Println(ssh_client.Run("ls -l"))
-	log.Println(ssh_client.Run("whoami"))
+var (
+	privateKey string
+	user       string
+	host       string
+)
 
+func init() {
+	tmp, _ := ioutil.ReadFile("/Users/hugozhu/.ssh/mefans_id_rsa")
+	privateKey = string(tmp)
+	user = "hugo"
+	host = "us.myalert.info:22"
+}
+
+func main() {
+	my_agent := agent.New(user, privateKey, host)
+	my_agent.Run(func(output string, err error) {
+		log.Println(output, err)
+	})
+	my_agent.Send("ls -l")
+	time.Sleep(5 * time.Second)
 }

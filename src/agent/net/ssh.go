@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -88,7 +89,7 @@ func NewSSHClient(user string, privateKey string, host string) *SSHClient {
 	return c
 }
 
-func (c *SSHClient) connect() {
+func (c *SSHClient) connect() error {
 	if !c.Connected {
 		config := &ssh.ClientConfig{
 			User: c.User,
@@ -99,16 +100,18 @@ func (c *SSHClient) connect() {
 		conn, err := ssh.Dial("tcp", c.Host, config)
 		// defer conn.Close()
 		if err != nil {
-			panic("Failed to dial:" + err.Error())
+			return err
 		}
 		log.Println("[Info] connected to " + c.Host)
 
 		c.Connection = conn
 		c.Connected = true
 	}
+	return nil
 }
 
-func (c *SSHClient) Run(command string) string {
+func (c *SSHClient) Run(command string) (string, error) {
+	var err error
 	defer func() {
 		/**
 		 *  Reconnect if there is problems
@@ -116,20 +119,24 @@ func (c *SSHClient) Run(command string) string {
 		if x := recover(); x != nil {
 			c.Close()
 			c.Connected = false
-			log.Printf("[Error] failed to connect %s: %v", c.Host, x)
+			err = errors.New(fmt.Sprintf("[Error] failed to connect %s: %v", c.Host, x))
 		}
 	}()
 
-	c.connect()
-	var b bytes.Buffer
-	session, _ := c.Connection.NewSession()
-	defer session.Close()
+	err = c.connect()
+	if err == nil {
+		var b bytes.Buffer
+		session, _ := c.Connection.NewSession()
+		defer session.Close()
 
-	session.Stdout = &b
-	if err := session.Run(command); err != nil {
-		panic("Failed to run: " + err.Error())
+		session.Stdout = &b
+		if err = session.Run(command); err != nil {
+			log.Println("Failed to run: " + err.Error())
+		}
+		return b.String(), err
 	}
-	return b.String()
+
+	return "error", err
 }
 
 func (c *SSHClient) Close() {
